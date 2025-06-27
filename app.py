@@ -37,9 +37,9 @@ def recommend(drug_name):
         list(enumerate(similarity_scores[index])),
         key=lambda x: x[1],
         reverse=True
-    )[1:20]  # get more, filter later
+    )[1:20]  # more to work with
 
-    # Get condition of the input drug
+    # Try filtering by same condition
     try:
         drug_condition = med[med['drugName'] == drug_name]['condition'].values[0]
     except IndexError:
@@ -64,7 +64,23 @@ def recommend(drug_name):
         if len(data) == 5:
             break
 
+    # Fallback: if nothing found with same condition
+    if len(data) == 0:
+        for i in similar_items:
+            temp_df = med[med['drugName'] == pt.index[i[0]]].drop_duplicates('drugName')
+            if not temp_df.empty:
+                item = [
+                    temp_df['drugName'].values[0],
+                    temp_df['condition'].values[0],
+                    temp_df['review'].values[0],
+                    temp_df['rating'].values[0]
+                ]
+                data.append(item)
+            if len(data) == 5:
+                break
+
     return data
+
 
 
 # -----------------------------
