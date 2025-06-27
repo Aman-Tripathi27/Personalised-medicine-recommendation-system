@@ -4,13 +4,16 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import bz2
+
+
 
 # -----------------------------
 # Load Data & Models
 # -----------------------------
 @st.cache_data
 def load_all():
-    med = pickle.load(open("med.pkl", "rb"))
+    med = pickle.load(bz2.BZ2File("med_compressed.pkl.bz2", "rb"))
     pt = pickle.load(open("pt.pkl", "rb"))
     similarity_scores = pickle.load(open("similarity_scores.pkl", "rb"))
 
