@@ -2,39 +2,45 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-import requests
-import io
+import gdown
+import zipfile
+import os
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------ 🔽 HELPER TO LOAD FROM DRIVE ------------------ #
-def load_pickle_from_drive(file_id):
-    url = f"https://drive.google.com/uc?id={file_id}"
-    response = requests.get(url)
-    return pickle.load(io.BytesIO(response.content))
+# ------------------ 🔽 Download from Drive ------------------ #
+def load_pickle_from_drive(file_id, filename):
+    gdown.download(id=file_id, output=filename, quiet=True)
+    with open(filename, "rb") as f:
+        return pickle.load(f)
 
-# ------------------ 🔽 LOAD PICKLES ------------------ #
+# ------------------ 🔽 Unzip and load local .pkl from zip ------------------ #
+def load_pickle_from_zip(zip_filename, pkl_filename):
+    with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
+        zip_ref.extract(pkl_filename)
+    with open(pkl_filename, "rb") as f:
+        return pickle.load(f)
+
+# ------------------ 🔽 Load All Pickles ------------------ #
 @st.cache_data
 def load_all():
-    grouped = load_pickle_from_drive("1Q1d2ktBMd1FXMbo0McD6zVFhlqs3p4dY")  # grouped.pkl
-    similarity_matrix = load_pickle_from_drive("1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D")  # similarity_matrix.pkl
+    grouped = load_pickle_from_drive("1Q1d2ktBMd1FXMbo0McD6zVFhlqs3p4dY", "grouped.pkl")
+    similarity_matrix = load_pickle_from_drive("1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D", "similarity_matrix.pkl")
 
-    with open("tfidf.pkl", "rb") as f:
-        tfidf = pickle.load(f)
-    with open("combined_features.pkl", "rb") as f:
-        combined_features = pickle.load(f)
+    tfidf = load_pickle_from_zip("tfidf.pkl.zip", "tfidf.pkl")
+    combined_features = load_pickle_from_zip("combined_features.pkl.zip", "combined_features.pkl")
 
     return grouped, similarity_matrix, tfidf, combined_features
 
 grouped, similarity_matrix, tfidf, combined_features = load_all()
 
-# ------------------ 🔽 RECOMMENDATION FUNCTION ------------------ #
+# ------------------ 🔍 Recommendation Function ------------------ #
 def recommend(drug_name, top_n=5):
     selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
     if selected.empty:
-        return []
+        return "❌ No matching drug found."
 
     index = selected.index[0]
-    sim_scores = similarity_matrix[index]
+    sim_scores = cosine_similarity(combined_features[index], combined_features).flatten()
     similar_indices = sim_scores.argsort()[::-1][1:top_n+1]
 
     recommendations = []
@@ -50,23 +56,21 @@ def recommend(drug_name, top_n=5):
 
     return recommendations
 
-# ------------------ 🔽 STREAMLIT UI ------------------ #
-st.title("💊 Personalized Medicine Recommender")
+# ------------------ 🧠 Streamlit UI ------------------ #
+st.title("💊 Personalized Medicine Recommendation")
 
-drug_input = st.text_input("Enter a medicine name (e.g., 'Afatinib')")
+drug_input = st.text_input("Enter a medicine name:")
 
-if st.button("Recommend"):
-    if not drug_input.strip():
-        st.warning("⚠️ Please enter a medicine name.")
+if st.button("Recommend") and drug_input:
+    results = recommend(drug_input)
+    if isinstance(results, str):
+        st.error(results)
     else:
-        results = recommend(drug_input.strip())
-        if not results:
-            st.error("❌ No similar medicines found.")
-        else:
-            for rec in results:
-                st.markdown(f"### 🧪 Medicine: {rec['🧪 Medicine']}")
-                st.markdown(f"📋 **Condition**: {rec['📋 Condition']}")
-                st.markdown(f"⭐ **Rating**: {rec['⭐ Rating']}")
-                st.markdown(f"📊 **Similarity**: {rec['📊 Similarity']}")
-                st.markdown(f"🗣 **Review**: _{rec['🗣 Review']}_")
-                st.markdown("---")
+        for rec in results:
+            st.markdown(f"""---
+**🧪 Medicine:** {rec['🧪 Medicine']}  
+**📋 Condition:** {rec['📋 Condition']}  
+**⭐ Rating:** {rec['⭐ Rating']}  
+**📊 Similarity:** {rec['📊 Similarity']}  
+**🗣 Review:** {rec['🗣 Review']}  
+""")
