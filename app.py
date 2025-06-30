@@ -1,87 +1,72 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os
-import gdown
 import pickle
-import zipfile
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import MinMaxScaler
+import requests
+import io
 from sklearn.metrics.pairwise import cosine_similarity
-from scipy.sparse import hstack, csr_matrix
 
-# 📥 Step 1: Download zipped pickle from Google Drive
+# ------------------ 🔽 HELPER TO LOAD FROM DRIVE ------------------ #
+def load_pickle_from_drive(file_id):
+    url = f"https://drive.google.com/uc?id={file_id}"
+    response = requests.get(url)
+    return pickle.load(io.BytesIO(response.content))
+
+# ------------------ 🔽 LOAD PICKLES ------------------ #
 @st.cache_data
-def download_and_extract_pickle():
-    zip_file = "med.pkl.zip"
-    pkl_file = "med.pkl"
-    # Google Drive shareable ID (replace if needed)
-    gdrive_url = "https://drive.google.com/uc?id=1shXUL3RkrSz_NDYsqFd2XU_Y3DNvMkOF"
+def load_all():
+    grouped = load_pickle_from_drive("1Q1d2ktBMd1FXMbo0McD6zVFhlqs3p4dY")  # grouped.pkl
+    similarity_matrix = load_pickle_from_drive("1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D")  # similarity_matrix.pkl
 
-    if not os.path.exists(zip_file):
-        gdown.download(gdrive_url, zip_file, quiet=False)
+    with open("tfidf.pkl", "rb") as f:
+        tfidf = pickle.load(f)
+    with open("combined_features.pkl", "rb") as f:
+        combined_features = pickle.load(f)
 
-    if not os.path.exists(pkl_file):
-        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-            zip_ref.extract(pkl_file)
+    return grouped, similarity_matrix, tfidf, combined_features
 
-    with open(pkl_file, 'rb') as f:
-        med = pickle.load(f)
-    return med
+grouped, similarity_matrix, tfidf, combined_features = load_all()
 
-# ⚙️ Step 2: Feature engineering
-@st.cache_data
-def compute_features(med):
-    med['text'] = med['drugName'].astype(str) + " " + med['condition'].astype(str)
-    tfidf = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = tfidf.fit_transform(med['text'])
-    scaler = MinMaxScaler()
-    rating_vector = scaler.fit_transform(med[['rating']])
-    combined_features = hstack([tfidf_matrix, rating_vector])
-    return csr_matrix(combined_features)
-
-# 🔍 Step 3: Recommendation logic
-def recommend(drug_name, med, combined_features, top_n=5):
-    indices = med[med['drugName'].str.lower() == drug_name.lower()].index.tolist()
-    if not indices:
+# ------------------ 🔽 RECOMMENDATION FUNCTION ------------------ #
+def recommend(drug_name, top_n=5):
+    selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
+    if selected.empty:
         return []
-    index = indices[0]
-    sim_scores = cosine_similarity(combined_features[index], combined_features).flatten()
-    similar_indices = sim_scores.argsort()[::-1][1:top_n + 1]
 
-    results = []
+    index = selected.index[0]
+    sim_scores = similarity_matrix[index]
+    similar_indices = sim_scores.argsort()[::-1][1:top_n+1]
+
+    recommendations = []
     for i in similar_indices:
-        row = med.iloc[i]
-        results.append({
-            '🧪 Medicine': row['drugName'],
-            '📋 Condition': row['condition'],
-            '⭐ Rating': row['rating'],
-            '🗣 Review': row['review'][:300] + "..." if len(row['review']) > 300 else row['review'],
-            '📊 Similarity Score': round(sim_scores[i], 3)
-        })
-    return results
+        rec = {
+            "🧪 Medicine": grouped.iloc[i]['drugName'],
+            "📋 Condition": grouped.iloc[i]['condition'],
+            "⭐ Rating": round(grouped.iloc[i]['rating'], 2),
+            "📊 Similarity": round(sim_scores[i], 3),
+            "🗣 Review": grouped.iloc[i]['review'][:300] + "..."
+        }
+        recommendations.append(rec)
 
-# 🌐 Streamlit UI
+    return recommendations
+
+# ------------------ 🔽 STREAMLIT UI ------------------ #
 st.title("💊 Personalized Medicine Recommender")
 
-med = download_and_extract_pickle()
-combined_features = compute_features(med)
-
-drug_list = sorted(med['drugName'].dropna().unique())
-selected_drug = st.selectbox("Select a medicine to find similar ones:", drug_list)
+drug_input = st.text_input("Enter a medicine name (e.g., 'Afatinib')")
 
 if st.button("Recommend"):
-    results = recommend(selected_drug, med, combined_features)
-    if not results:
-        st.error("No similar medicines found.")
+    if not drug_input.strip():
+        st.warning("⚠️ Please enter a medicine name.")
     else:
-        for r in results:
-            st.markdown(f"""
-            ---
-            🧪 **Medicine**: `{r['🧪 Medicine']}`  
-            📋 **Condition**: _{r['📋 Condition']}_  
-            ⭐ **Rating**: {r['⭐ Rating']}  
-            📊 **Similarity**: {r['📊 Similarity Score']}  
-            🗣 **Review**: {r['🗣 Review']}
-            """)
+        results = recommend(drug_input.strip())
+        if not results:
+            st.error("❌ No similar medicines found.")
+        else:
+            for rec in results:
+                st.markdown(f"### 🧪 Medicine: {rec['🧪 Medicine']}")
+                st.markdown(f"📋 **Condition**: {rec['📋 Condition']}")
+                st.markdown(f"⭐ **Rating**: {rec['⭐ Rating']}")
+                st.markdown(f"📊 **Similarity**: {rec['📊 Similarity']}")
+                st.markdown(f"🗣 **Review**: _{rec['🗣 Review']}_")
+                st.markdown("---")
