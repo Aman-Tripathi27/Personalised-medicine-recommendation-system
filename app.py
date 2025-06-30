@@ -1,23 +1,42 @@
 import streamlit as st
-import pickle
+import pandas as pd
 import numpy as np
+import os
+import gdown
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
+from scipy.sparse import hstack, csr_matrix
 
-# Load files
-with open("med.pkl", "rb") as f:
-    med = pickle.load(f)
+# 📥 Download from Google Drive if not exists
+@st.cache_data
+def load_data():
+    file_path = "drugs.csv"
+    if not os.path.exists(file_path):
+        url = "https://drive.google.com/uc?id=1shXUL3RkrSz_NDYsqFd2XU_Y3DNvMkOF"
+        gdown.download(url, file_path, quiet=False)
+    med = pd.read_csv(file_path)
+    med.dropna(subset=['drugName', 'condition', 'review', 'rating'], inplace=True)
+    return med
 
-with open("combined_features.pkl", "rb") as f:
-    combined_features = pickle.load(f)
+@st.cache_data
+def compute_features(med):
+    med['text'] = med['drugName'].astype(str) + " " + med['condition'].astype(str)
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(med['text'])
+    scaler = MinMaxScaler()
+    rating_vector = scaler.fit_transform(med[['rating']])
+    combined_features = hstack([tfidf_matrix, rating_vector])
+    return csr_matrix(combined_features)
 
-# Recommendation function
-def recommend(drug_name, top_n=5):
+def recommend(drug_name, med, combined_features, top_n=5):
     indices = med[med['drugName'].str.lower() == drug_name.lower()].index.tolist()
     if not indices:
         return []
     index = indices[0]
     sim_scores = cosine_similarity(combined_features[index], combined_features).flatten()
-    similar_indices = sim_scores.argsort()[::-1][1:top_n+1]
+    similar_indices = sim_scores.argsort()[::-1][1:top_n + 1]
+
     results = []
     for i in similar_indices:
         row = med.iloc[i]
@@ -30,21 +49,27 @@ def recommend(drug_name, top_n=5):
         })
     return results
 
-# UI
+# 🌐 Streamlit UI
 st.title("💊 Personalized Medicine Recommender")
-selected_drug = st.selectbox("Select a medicine", sorted(med['drugName'].unique()))
+
+med = load_data()
+combined_features = compute_features(med)
+
+drug_list = sorted(med['drugName'].dropna().unique())
+selected_drug = st.selectbox("Select a medicine to find similar ones:", drug_list)
 
 if st.button("Recommend"):
-    output = recommend(selected_drug)
-    if not output:
+    results = recommend(selected_drug, med, combined_features)
+    if not results:
         st.error("No similar medicines found.")
     else:
-        for o in output:
+        for r in results:
             st.markdown(f"""
             ---
-            🧪 **Medicine**: `{o['🧪 Medicine']}`  
-            📋 **Condition**: _{o['📋 Condition']}_  
-            ⭐ **Rating**: {o['⭐ Rating']}  
-            📊 **Similarity**: {o['📊 Similarity Score']}  
-            🗣 **Review**: {o['🗣 Review']}
+            🧪 **Medicine**: `{r['🧪 Medicine']}`  
+            📋 **Condition**: _{r['📋 Condition']}_  
+            ⭐ **Rating**: {r['⭐ Rating']}  
+            📊 **Similarity**: {r['📊 Similarity Score']}  
+            🗣 **Review**: {r['🗣 Review']}
             """)
+
