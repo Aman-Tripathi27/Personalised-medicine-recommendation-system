@@ -3,22 +3,34 @@ import pandas as pd
 import numpy as np
 import os
 import gdown
+import pickle
+import zipfile
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.sparse import hstack, csr_matrix
 
-# 📥 Download from Google Drive if not exists
+# 📥 Step 1: Download zipped pickle from Google Drive
 @st.cache_data
-def load_data():
-    file_path = "drugs.csv"
-    if not os.path.exists(file_path):
-        url = "https://drive.google.com/uc?id=1shXUL3RkrSz_NDYsqFd2XU_Y3DNvMkOF"
-        gdown.download(url, file_path, quiet=False)
-    med = pd.read_csv(file_path)
-    med.dropna(subset=['drugName', 'condition', 'review', 'rating'], inplace=True)
+def download_and_extract_pickle():
+    zip_file = "med.pkl.zip"
+    pkl_file = "med.pkl"
+    # Google Drive shareable ID (replace if needed)
+    gdrive_url = "https://drive.google.com/uc?id=1shXUL3RkrSz_NDYsqFd2XU_Y3DNvMkOF"
+
+    if not os.path.exists(zip_file):
+        gdown.download(gdrive_url, zip_file, quiet=False)
+
+    if not os.path.exists(pkl_file):
+        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+            zip_ref.extract(pkl_file)
+
+    with open(pkl_file, 'rb') as f:
+        med = pickle.load(f)
     return med
 
+# ⚙️ Step 2: Feature engineering
 @st.cache_data
 def compute_features(med):
     med['text'] = med['drugName'].astype(str) + " " + med['condition'].astype(str)
@@ -29,6 +41,7 @@ def compute_features(med):
     combined_features = hstack([tfidf_matrix, rating_vector])
     return csr_matrix(combined_features)
 
+# 🔍 Step 3: Recommendation logic
 def recommend(drug_name, med, combined_features, top_n=5):
     indices = med[med['drugName'].str.lower() == drug_name.lower()].index.tolist()
     if not indices:
@@ -52,7 +65,7 @@ def recommend(drug_name, med, combined_features, top_n=5):
 # 🌐 Streamlit UI
 st.title("💊 Personalized Medicine Recommender")
 
-med = load_data()
+med = download_and_extract_pickle()
 combined_features = compute_features(med)
 
 drug_list = sorted(med['drugName'].dropna().unique())
@@ -72,4 +85,3 @@ if st.button("Recommend"):
             📊 **Similarity**: {r['📊 Similarity Score']}  
             🗣 **Review**: {r['🗣 Review']}
             """)
-
