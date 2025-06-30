@@ -4,12 +4,11 @@ import numpy as np
 import pickle
 import gdown
 import zipfile
-import os
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------ 🔽 Download from Drive ------------------ #
-def load_pickle_from_drive(file_id, filename):
-    gdown.download(id=file_id, output=filename, quiet=True)
+# ------------------ 🔽 Download from Google Drive using full link ------------------ #
+def load_pickle_from_drive(drive_url, filename):
+    gdown.download(drive_url, output=filename, quiet=False, fuzzy=True)
     with open(filename, "rb") as f:
         return pickle.load(f)
 
@@ -23,8 +22,12 @@ def load_pickle_from_zip(zip_filename, pkl_filename):
 # ------------------ 🔽 Load All Pickles ------------------ #
 @st.cache_data
 def load_all():
-    grouped = load_pickle_from_drive("1Q1d2ktBMd1FXMbo0McD6zVFhlqs3p4dY", "grouped.pkl")
-    similarity_matrix = load_pickle_from_drive("1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D", "similarity_matrix.pkl")
+    grouped = load_pickle_from_drive(
+        "https://drive.google.com/uc?id=1Q1d2ktBMd1FXMbo0McD6zVFhlqs3p4dY", "grouped.pkl"
+    )
+    similarity_matrix = load_pickle_from_drive(
+        "https://drive.google.com/uc?id=1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D", "similarity_matrix.pkl"
+    )
 
     tfidf = load_pickle_from_zip("tfidf.pkl.zip", "tfidf.pkl")
     combined_features = load_pickle_from_zip("combined_features.pkl.zip", "combined_features.pkl")
