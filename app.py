@@ -2,13 +2,12 @@ import streamlit as st
 import pickle
 import zipfile
 import gdown
-import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 # ------------------ 🔽 UTILITY FUNCTIONS ------------------ #
 
 def load_pickle_from_drive(file_id, filename):
-    gdown.download(id=file_id, output=filename, quiet=False, use_cookies=False)
+    gdown.download(id=file_id, output=filename, quiet=False, fuzzy=True)
     with open(filename, "rb") as f:
         return pickle.load(f)
 
@@ -17,12 +16,18 @@ def load_pickle_from_zip(zip_filename, pkl_filename):
         with z.open(pkl_filename) as f:
             return pickle.load(f)
 
-# ------------------ 🔽 LOAD PICKLES ------------------ #
+# ------------------ 🔽 LOAD ALL PICKLES ------------------ #
 
 @st.cache_data
 def load_all():
-    grouped = load_pickle_from_drive("19WuebrbB6SC-E-LthgFlPRdMUnDpcyOi", "grouped.pkl")
-    similarity_matrix = load_pickle_from_drive("1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D", "similarity_matrix.pkl")
+    grouped = load_pickle_from_drive(
+        "1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5",  # ✅ Your new grouped.pkl
+        "grouped.pkl"
+    )
+    similarity_matrix = load_pickle_from_drive(
+        "1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D",  # ✅ similarity_matrix.pkl
+        "similarity_matrix.pkl"
+    )
     tfidf = load_pickle_from_zip("tfidf.pkl.zip", "tfidf.pkl")
     combined_features = load_pickle_from_zip("combined.pkl.zip", "combined.pkl")
     return grouped, similarity_matrix, tfidf, combined_features
@@ -54,6 +59,7 @@ def recommend(drug_name, top_n=5):
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
+# Load data
 grouped, similarity_matrix, tfidf, combined_features = load_all()
 
 drug_name = st.text_input("🔍 Enter a medicine name:", "")
