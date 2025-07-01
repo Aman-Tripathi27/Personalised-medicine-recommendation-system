@@ -2,12 +2,14 @@ import streamlit as st
 import pickle
 import zipfile
 import gdown
+import os
 from sklearn.metrics.pairwise import cosine_similarity
 
 # ------------------ 🔽 UTILITY FUNCTIONS ------------------ #
 
 def load_pickle_from_drive(file_id, filename):
-    gdown.download(id=file_id, output=filename, quiet=False, fuzzy=True)
+    if not os.path.exists(filename):
+        gdown.download(id=file_id, output=filename, quiet=False, fuzzy=True)
     with open(filename, "rb") as f:
         return pickle.load(f)
 
@@ -16,16 +18,16 @@ def load_pickle_from_zip(zip_filename, pkl_filename):
         with z.open(pkl_filename) as f:
             return pickle.load(f)
 
-# ------------------ 🔽 LOAD ALL PICKLES ------------------ #
+# ------------------ 🔽 LOAD PICKLES ------------------ #
 
 @st.cache_data
 def load_all():
     grouped = load_pickle_from_drive(
-        "1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5",  # ✅ Your new grouped.pkl
+        "1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5",  # grouped.pkl
         "grouped.pkl"
     )
     similarity_matrix = load_pickle_from_drive(
-        "1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D",  # ✅ similarity_matrix.pkl
+        "1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0",  # similarity_matrix.pkl
         "similarity_matrix.pkl"
     )
     tfidf = load_pickle_from_zip("tfidf.pkl.zip", "tfidf.pkl")
