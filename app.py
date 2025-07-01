@@ -1,30 +1,32 @@
 import streamlit as st
 import pickle
 import gdown
+import os
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------ 🔽 Google Drive Loader ------------------ #
+# ------------------ 🔽 DOWNLOAD + LOAD PICKLE ------------------ #
+
 def download_pickle_from_gdrive(file_id, filename):
-    url = f"https://drive.google.com/uc?id={file_id}"
-    gdown.download(url, output=filename, quiet=False, fuzzy=True)
+    if not os.path.exists(filename):
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        gdown.download(url, output=filename, quiet=False)
     with open(filename, "rb") as f:
         return pickle.load(f)
 
-# ------------------ 🔽 Load All Files ------------------ #
+# ------------------ 🔽 LOAD ALL DATA ------------------ #
+
 @st.cache_data
 def load_all():
-    grouped = download_pickle_from_gdrive("1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0", "grouped.pkl")
-    similarity_matrix = download_pickle_from_gdrive("1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5", "similarity_matrix.pkl")
-
-    with open("tfidf.pkl", "rb") as f:
-        tfidf = pickle.load(f)
-    with open("combined_features.pkl", "rb") as f:
-        combined_features = pickle.load(f)
-
+    grouped = download_pickle_from_gdrive("1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5", "grouped.pkl")
+    similarity_matrix = download_pickle_from_gdrive("1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0", "similarity_matrix.pkl")
+    with open("tfidf.pkl", "rb") as f1, open("combined_features.pkl", "rb") as f2:
+        tfidf = pickle.load(f1)
+        combined_features = pickle.load(f2)
     return grouped, similarity_matrix, tfidf, combined_features
 
-# ------------------ 🔍 Recommendation Function ------------------ #
+# ------------------ 🔍 RECOMMENDATION FUNCTION ------------------ #
+
 def recommend(drug_name, top_n=5):
     selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
     if selected.empty:
@@ -45,15 +47,15 @@ def recommend(drug_name, top_n=5):
         results.append(rec)
     return results
 
-# ------------------ 🔽 Streamlit UI ------------------ #
+# ------------------ 🖥️ MAIN APP UI ------------------ #
+
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
-# Load Data
+# Load data
 grouped, similarity_matrix, tfidf, combined_features = load_all()
 
-# Input
-drug_name = st.text_input("🔍 Enter a medicine name:", "")
+drug_name = st.text_input("🔍 Enter a medicine name:")
 if drug_name:
     with st.spinner("🔎 Finding similar medicines..."):
         output = recommend(drug_name)
