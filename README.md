@@ -100,13 +100,5 @@ If you're passionate about **healthcare AI**, **clinical NLP**, or **drug discov
 
 ---
 
-## 📣 Author
 
-**Aman Tripathi**  
-🔗 [LinkedIn](https://linkedin.com/in/yourprofile) &nbsp;&nbsp;&nbsp;🐦 [Twitter / X](https://x.com/yourprofile)  
-🛠 Proud builder of tech for health.
-
----
-
-> _“Precision medicine isn’t the future. It’s now.”_
 
