@@ -1,15 +1,22 @@
 import streamlit as st
 import pickle
+import gdown
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------ 🔽 LOAD PICKLES ------------------ #
+# ------------------ 🔽 Google Drive Loader ------------------ #
+def download_pickle_from_gdrive(file_id, filename):
+    url = f"https://drive.google.com/uc?id={file_id}"
+    gdown.download(url, output=filename, quiet=False, fuzzy=True)
+    with open(filename, "rb") as f:
+        return pickle.load(f)
+
+# ------------------ 🔽 Load All Files ------------------ #
 @st.cache_data
 def load_all():
-    with open("grouped.pkl", "rb") as f:
-        grouped = pickle.load(f)
-    with open("similarity_matrix.pkl", "rb") as f:
-        similarity_matrix = pickle.load(f)
+    grouped = download_pickle_from_gdrive("1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0", "grouped.pkl")
+    similarity_matrix = download_pickle_from_gdrive("1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5", "similarity_matrix.pkl")
+
     with open("tfidf.pkl", "rb") as f:
         tfidf = pickle.load(f)
     with open("combined_features.pkl", "rb") as f:
@@ -17,7 +24,7 @@ def load_all():
 
     return grouped, similarity_matrix, tfidf, combined_features
 
-# ------------------ 🔍 RECOMMENDATION FUNCTION ------------------ #
+# ------------------ 🔍 Recommendation Function ------------------ #
 def recommend(drug_name, top_n=5):
     selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
     if selected.empty:
@@ -38,13 +45,14 @@ def recommend(drug_name, top_n=5):
         results.append(rec)
     return results
 
-# ------------------ 🔽 MAIN UI ------------------ #
+# ------------------ 🔽 Streamlit UI ------------------ #
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
-# Load data
+# Load Data
 grouped, similarity_matrix, tfidf, combined_features = load_all()
 
+# Input
 drug_name = st.text_input("🔍 Enter a medicine name:", "")
 if drug_name:
     with st.spinner("🔎 Finding similar medicines..."):
