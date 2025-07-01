@@ -1,34 +1,15 @@
 import streamlit as st
 import pickle
-import requests
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------ 🔽 UTILITY FUNCTIONS ------------------ #
-
-def download_pickle_from_gdrive(url, filename):
-    """Download a pickle file from Google Drive using requests."""
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise Exception(f"Failed to download {filename} from Google Drive.")
-    with open(filename, "wb") as f:
-        f.write(response.content)
-    with open(filename, "rb") as f:
-        return pickle.load(f)
-
 # ------------------ 🔽 LOAD PICKLES ------------------ #
-
 @st.cache_data
 def load_all():
-    grouped = download_pickle_from_gdrive(
-        "https://drive.google.com/uc?export=download&id=1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0",
-        "grouped.pkl"
-    )
-    similarity_matrix = download_pickle_from_gdrive(
-        "https://drive.google.com/uc?export=download&id=1d0RFiRioEy4EWN4M2tofRLyMvWcO9g3D",
-        "similarity_matrix.pkl"
-    )
-
+    with open("grouped.pkl", "rb") as f:
+        grouped = pickle.load(f)
+    with open("similarity_matrix.pkl", "rb") as f:
+        similarity_matrix = pickle.load(f)
     with open("tfidf.pkl", "rb") as f:
         tfidf = pickle.load(f)
     with open("combined_features.pkl", "rb") as f:
@@ -37,7 +18,6 @@ def load_all():
     return grouped, similarity_matrix, tfidf, combined_features
 
 # ------------------ 🔍 RECOMMENDATION FUNCTION ------------------ #
-
 def recommend(drug_name, top_n=5):
     selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
     if selected.empty:
@@ -59,7 +39,6 @@ def recommend(drug_name, top_n=5):
     return results
 
 # ------------------ 🔽 MAIN UI ------------------ #
-
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
