@@ -1,49 +1,30 @@
 import streamlit as st
 import pickle
-import pandas as pd
 import requests
+import pandas as pd
+import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
-# ------------------ 🔽 Download Helper ------------------ #
-def download_file(url, filename, is_pickle=True):
+# ------------------ 🔽 DOWNLOAD FROM HUGGINGFACE ------------------ #
+@st.cache_resource
+def load_pickle_from_url(url):
     response = requests.get(url)
     response.raise_for_status()
-    if is_pickle:
-        return pickle.loads(response.content)
-    else:
-        with open(filename, "wb") as f:
-            f.write(response.content)
-        return filename
+    return pickle.loads(response.content)
 
-# ------------------ 🔽 Load Data ------------------ #
-@st.cache_data
+# ------------------ 🔽 LOAD ALL FILES ------------------ #
+@st.cache_resource
 def load_all():
-    grouped = download_file(
-        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/grouped.pkl",
-        "grouped.pkl"
-    )
-    similarity_matrix = download_file(
-        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/similarity_matrix.pkl",
-        "similarity_matrix.pkl"
-    )
-    tfidf = download_file(
-        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/tfidf.pkl",
-        "tfidf.pkl"
-    )
-    combined_features = download_file(
-        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/combined_features.pkl",
-        "combined_features.pkl"
-    )
-    drugs_csv_path = download_file(
-        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/drugs.csv",
-        "drugs.csv",
-        is_pickle=False
-    )
-    drugs_df = pd.read_csv(drugs_csv_path)
-    return grouped, similarity_matrix, tfidf, combined_features, drugs_df
+    grouped = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/grouped.pkl")
+    similarity_matrix = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/similarity_matrix.pkl")
+    tfidf = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/tfidf.pkl")
+    combined_features = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/combined_features.pkl")
+    return grouped, similarity_matrix, tfidf, combined_features
 
-# ------------------ 🔍 Recommendation Logic ------------------ #
-def recommend(drug_name, grouped, combined_features, top_n=5):
+# ------------------ 🔍 RECOMMENDATION FUNCTION ------------------ #
+def recommend(drug_name, top_n=5):
     selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
     if selected.empty:
         return f"❌ No match found for: {drug_name}"
@@ -63,27 +44,35 @@ def recommend(drug_name, grouped, combined_features, top_n=5):
         results.append(rec)
     return results
 
-# ------------------ 🔽 UI ------------------ #
+# ------------------ 🎛️ STREAMLIT UI ------------------ #
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
-grouped, similarity_matrix, tfidf, combined_features, drugs_df = load_all()
+# Load data
+with st.spinner("📦 Loading model and data..."):
+    grouped, similarity_matrix, tfidf, combined_features = load_all()
 
-drug_list = sorted(drugs_df['drugName'].dropna().unique())
-drug_name = st.selectbox("🔽 Select a medicine:", drug_list)
+# Dropdown for drug selection
+drug_list = sorted(grouped['drugName'].dropna().unique())
+drug_name = st.selectbox("🔍 Select a medicine:", drug_list)
 
+# Show recommendations
 if drug_name:
     with st.spinner("🔎 Finding similar medicines..."):
-        output = recommend(drug_name, grouped, combined_features)
+        output = recommend(drug_name)
         if isinstance(output, str):
             st.warning(output)
         else:
             for rec in output:
-                st.markdown(f"""
-                **🧪 Medicine:** {rec['🧪 Medicine']}  
-                **📋 Condition:** {rec['📋 Condition']}  
-                **⭐ Rating:** {rec['⭐ Rating']}  
-                **📊 Similarity:** {rec['📊 Similarity']}  
-                **🗣 Review:** {rec['🗣 Review']}  
-                ---
-                """)
+                st.markdown(
+                    f"""
+                    <div style='font-size: 14px; line-height: 1.6; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;'>
+                        <b>🧪 Medicine:</b> {rec['🧪 Medicine']}<br>
+                        <b>📋 Condition:</b> {rec['📋 Condition']}<br>
+                        <b>⭐ Rating:</b> {rec['⭐ Rating']}<br>
+                        <b>📊 Similarity:</b> {rec['📊 Similarity']}<br>
+                        <b>🗣 Review:</b> {rec['🗣 Review']}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
