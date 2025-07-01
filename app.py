@@ -1,39 +1,32 @@
 import streamlit as st
 import pickle
-import zipfile
 import gdown
+import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------ 🔽 Utility Functions ------------------ #
+# ------------------ 🔽 UTILITY FUNCTIONS ------------------ #
 
 def load_pickle_from_drive(file_id, filename):
     url = f"https://drive.google.com/uc?id={file_id}"
-    gdown.download(url, output=filename, quiet=False, fuzzy=True)
+    gdown.download(url, output=filename, quiet=False, use_cookies=False)
     with open(filename, "rb") as f:
         return pickle.load(f)
 
-def load_pickle_from_zip(zip_filename, pkl_filename):
-    with zipfile.ZipFile(zip_filename, 'r') as z:
-        with z.open(pkl_filename) as f:
-            return pickle.load(f)
+def load_local_pickle(filename):
+    with open(filename, "rb") as f:
+        return pickle.load(f)
 
-# ------------------ 🔽 Load All Models ------------------ #
+# ------------------ 🔽 LOAD ALL PICKLES ------------------ #
 
 @st.cache_data
 def load_all():
-    grouped = load_pickle_from_drive(
-        "1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0",  # grouped.pkl
-        "grouped.pkl"
-    )
-    similarity_matrix = load_pickle_from_drive(
-        "1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5",  # similarity_matrix.pkl
-        "similarity_matrix.pkl"
-    )
-    tfidf = load_pickle_from_zip("tfidf.zip", "tfidf.pkl")  # ✅ NOT tfidf.pkl.zip
-    combined_features = load_pickle_from_zip("combined_features.zip", "combined.pkl")
+    grouped = load_pickle_from_drive("1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0", "grouped.pkl")
+    similarity_matrix = load_pickle_from_drive("1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5", "similarity_matrix.pkl")
+    tfidf = load_local_pickle("tfidf.pkl")  # From GitHub repo
+    combined_features = load_local_pickle("combined_features.pkl")  # From GitHub repo
     return grouped, similarity_matrix, tfidf, combined_features
 
-# ------------------ 🔍 Recommendation Function ------------------ #
+# ------------------ 🔍 RECOMMENDATION FUNCTION ------------------ #
 
 def recommend(drug_name, top_n=5):
     selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
@@ -42,6 +35,7 @@ def recommend(drug_name, top_n=5):
     index = selected.index[0]
     sim_scores = cosine_similarity(combined_features[index], combined_features).flatten()
     similar_indices = sim_scores.argsort()[::-1][1:top_n+1]
+
     results = []
     for i in similar_indices:
         rec = {
@@ -54,11 +48,12 @@ def recommend(drug_name, top_n=5):
         results.append(rec)
     return results
 
-# ------------------ 🔽 UI ------------------ #
+# ------------------ 🔽 MAIN UI ------------------ #
 
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
+# Load data
 grouped, similarity_matrix, tfidf, combined_features = load_all()
 
 drug_name = st.text_input("🔍 Enter a medicine name:", "")
