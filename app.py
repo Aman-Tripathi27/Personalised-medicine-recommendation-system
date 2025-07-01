@@ -7,8 +7,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ------------------ 🔽 UTILITY FUNCTIONS ------------------ #
 
 def load_pickle_from_drive(file_id, filename):
-    url = f"https://drive.google.com/uc?id={file_id}"
-    gdown.download(url, output=filename, quiet=False, use_cookies=False)
+    gdown.download(id=file_id, output=filename, quiet=False, use_cookies=False)
     with open(filename, "rb") as f:
         return pickle.load(f)
 
@@ -20,10 +19,14 @@ def load_local_pickle(filename):
 
 @st.cache_data
 def load_all():
+    # ✅ Load from Drive (large files)
     grouped = load_pickle_from_drive("1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0", "grouped.pkl")
     similarity_matrix = load_pickle_from_drive("1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5", "similarity_matrix.pkl")
-    tfidf = load_local_pickle("tfidf.pkl")  # From GitHub repo
-    combined_features = load_local_pickle("combined_features.pkl")  # From GitHub repo
+
+    # ✅ Load from GitHub repo (directly present in root folder)
+    tfidf = load_local_pickle("tfidf.pkl")
+    combined_features = load_local_pickle("combined_features.pkl")
+
     return grouped, similarity_matrix, tfidf, combined_features
 
 # ------------------ 🔍 RECOMMENDATION FUNCTION ------------------ #
