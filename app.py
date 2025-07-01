@@ -6,8 +6,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 # ------------------ 🔽 UTILITY FUNCTIONS ------------------ #
 
-def load_pickle_from_drive(file_id, filename):
-    gdown.download(id=file_id, output=filename, quiet=False, use_cookies=False)
+def load_pickle_from_drive(file_url, filename):
+    gdown.download(file_url, output=filename, quiet=False, fuzzy=True)
     with open(filename, "rb") as f:
         return pickle.load(f)
 
@@ -19,11 +19,14 @@ def load_local_pickle(filename):
 
 @st.cache_data
 def load_all():
-    # ✅ Load from Drive (large files)
-    grouped = load_pickle_from_drive("1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0", "grouped.pkl")
-    similarity_matrix = load_pickle_from_drive("1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5", "similarity_matrix.pkl")
-
-    # ✅ Load from GitHub repo (directly present in root folder)
+    grouped = load_pickle_from_drive(
+        "https://drive.google.com/uc?id=1D8R85eUVDvNwHpS_M_8_gc-nlhunpZx0",
+        "grouped.pkl"
+    )
+    similarity_matrix = load_pickle_from_drive(
+        "https://drive.google.com/uc?id=1mLRUtjl2PubY3Ago0iAlrRtaUcROVFE5",
+        "similarity_matrix.pkl"
+    )
     tfidf = load_local_pickle("tfidf.pkl")
     combined_features = load_local_pickle("combined_features.pkl")
 
@@ -56,7 +59,6 @@ def recommend(drug_name, top_n=5):
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
-# Load data
 grouped, similarity_matrix, tfidf, combined_features = load_all()
 
 drug_name = st.text_input("🔍 Enter a medicine name:", "")
