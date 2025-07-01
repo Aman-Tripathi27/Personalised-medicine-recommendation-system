@@ -1,29 +1,49 @@
 import streamlit as st
 import pickle
+import pandas as pd
 import requests
-import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------ 🔽 UTILITY FUNCTION TO LOAD PICKLE FROM HUGGING FACE ------------------ #
-
-def load_pickle_from_url(url):
+# ------------------ 🔽 Download Helper ------------------ #
+def download_file(url, filename, is_pickle=True):
     response = requests.get(url)
     response.raise_for_status()
-    return pickle.loads(response.content)
+    if is_pickle:
+        return pickle.loads(response.content)
+    else:
+        with open(filename, "wb") as f:
+            f.write(response.content)
+        return filename
 
-# ------------------ 🔽 LOAD ALL FILES ------------------ #
-
+# ------------------ 🔽 Load Data ------------------ #
 @st.cache_data
 def load_all():
-    grouped = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/grouped.pkl")
-    similarity_matrix = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/similarity_matrix.pkl")
-    tfidf = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/tfidf.pkl")
-    combined_features = load_pickle_from_url("https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/combined_features.pkl")
-    return grouped, similarity_matrix, tfidf, combined_features
+    grouped = download_file(
+        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/grouped.pkl",
+        "grouped.pkl"
+    )
+    similarity_matrix = download_file(
+        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/similarity_matrix.pkl",
+        "similarity_matrix.pkl"
+    )
+    tfidf = download_file(
+        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/tfidf.pkl",
+        "tfidf.pkl"
+    )
+    combined_features = download_file(
+        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/combined_features.pkl",
+        "combined_features.pkl"
+    )
+    drugs_csv_path = download_file(
+        "https://huggingface.co/datasets/aman1527/personalised-medicine-files/resolve/main/drugs.csv",
+        "drugs.csv",
+        is_pickle=False
+    )
+    drugs_df = pd.read_csv(drugs_csv_path)
+    return grouped, similarity_matrix, tfidf, combined_features, drugs_df
 
-# ------------------ 🔍 RECOMMENDATION FUNCTION ------------------ #
-
-def recommend(drug_name, top_n=5):
+# ------------------ 🔍 Recommendation Logic ------------------ #
+def recommend(drug_name, grouped, combined_features, top_n=5):
     selected = grouped[grouped['drugName'].str.lower() == drug_name.lower()]
     if selected.empty:
         return f"❌ No match found for: {drug_name}"
@@ -43,18 +63,18 @@ def recommend(drug_name, top_n=5):
         results.append(rec)
     return results
 
-# ------------------ 🔽 MAIN UI ------------------ #
-
+# ------------------ 🔽 UI ------------------ #
 st.set_page_config(page_title="Medicine Recommendation", layout="wide")
 st.title("🧠 Personalized Medicine Recommendation System")
 
-# Load data
-grouped, similarity_matrix, tfidf, combined_features = load_all()
+grouped, similarity_matrix, tfidf, combined_features, drugs_df = load_all()
 
-drug_name = st.text_input("🔍 Enter a medicine name:", "")
+drug_list = sorted(drugs_df['drugName'].dropna().unique())
+drug_name = st.selectbox("🔽 Select a medicine:", drug_list)
+
 if drug_name:
     with st.spinner("🔎 Finding similar medicines..."):
-        output = recommend(drug_name)
+        output = recommend(drug_name, grouped, combined_features)
         if isinstance(output, str):
             st.warning(output)
         else:
